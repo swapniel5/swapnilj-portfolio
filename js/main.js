@@ -1,22 +1,23 @@
 document.documentElement.classList.add("js");
 
 const themeStorageKey = "swapnilj-portfolio-theme";
-let savedTheme = null;
+const systemColorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+const readStoredTheme = () => {
+  try {
+    const storedTheme = localStorage.getItem(themeStorageKey);
+    return storedTheme === "light" || storedTheme === "dark" ? storedTheme : null;
+  } catch {
+    return null;
+  }
+};
 
-try {
-  const storedTheme = localStorage.getItem(themeStorageKey);
-  if (storedTheme === "light" || storedTheme === "dark") savedTheme = storedTheme;
-} catch {
-  // The toggle still works for this page if browser storage is unavailable.
-}
-
-const initialTheme = savedTheme || "light";
-document.documentElement.dataset.theme = initialTheme;
+let hasUserPreference = readStoredTheme() !== null;
 
 const navigation = document.querySelector(".primary-nav");
+let themeButton;
 
 if (navigation) {
-  const themeButton = document.createElement("button");
+  themeButton = document.createElement("button");
   themeButton.className = "theme-toggle";
   themeButton.type = "button";
   themeButton.setAttribute("aria-label", "Switch to dark mode");
@@ -31,16 +32,40 @@ if (navigation) {
     themeButton.setAttribute("aria-pressed", String(isDark));
   };
 
-  updateThemeButton(initialTheme);
+  const applyTheme = (theme, persist = false) => {
+    document.documentElement.dataset.theme = theme;
+    updateThemeButton(theme);
+
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = theme === "dark" ? "#0b1724" : "#ffffff";
+
+    if (persist) {
+      hasUserPreference = true;
+      try {
+        localStorage.setItem(themeStorageKey, theme);
+      } catch {
+        // The selected theme remains active for this page.
+      }
+    }
+  };
+
+  const initialTheme = readStoredTheme() || (systemColorScheme.matches ? "dark" : "light");
+  applyTheme(initialTheme);
+
   themeButton.addEventListener("click", () => {
     const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = nextTheme;
-    updateThemeButton(nextTheme);
-    try {
-      localStorage.setItem(themeStorageKey, nextTheme);
-    } catch {
-      // Keep the selected theme for the current page when storage is unavailable.
-    }
+    applyTheme(nextTheme, true);
+  });
+
+  systemColorScheme.addEventListener("change", (event) => {
+    if (!hasUserPreference) applyTheme(event.matches ? "dark" : "light");
+  });
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== themeStorageKey && event.key !== null) return;
+    const storedTheme = readStoredTheme();
+    hasUserPreference = storedTheme !== null;
+    applyTheme(storedTheme || (systemColorScheme.matches ? "dark" : "light"));
   });
 }
 
